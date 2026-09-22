@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Programme {
+  PHONICS
+  SUPER_SPEAKERS
+  SUPER_CODERS
+  SUPER_MATH
+}
+
+enum Verdict {
+  GTG
+  ON_HOLD
+  NOT_CONSIDERED
+}
+
+enum Source {
+  FORM
+  BULK_CSV
+}
+
+model Candidate {
+  id             String    @id @default(cuid())
+  name           String
+  email          String?
+  phone          String?
+  subject        String?
+  programme      Programme
+  source         Source    @default(FORM)
+
+  resumeFileName String
+  resumeFilePath String
+  resumeMimeType String
+  resumeText     String
+  resumeSourceUrl String?
+
+  verdict        Verdict?
+  reason         String?
+  matchedProfile String?
+  fastTrack      Boolean   @default(false)
+  flags          String?
+  rawAnalysis    String?
+  analysisError  String?
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}

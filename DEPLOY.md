@@ -1,46 +1,38 @@
 # Deploying to Railway
 
-This app stores its database (SQLite) and uploaded resumes on local disk, so it needs a host with
-a **persistent volume** — Railway provides one directly. This gets you a real live link with
-almost no code changes.
+Two Railway services: this app (Dockerized) + Railway's managed Postgres plugin. Uploaded resume
+files live on a small volume attached to the app service.
+
+(A full frontend/backend/database split was considered and skipped — Next.js API routes already
+*are* the backend, colocated with the frontend by design. Splitting them would mean cross-origin
+auth cookies and duplicate deploy configs for no real benefit on an app this size.)
 
 ## One-time setup
 
-1. Go to [railway.app](https://railway.app) and sign in (GitHub sign-in is easiest, since the repo
-   is already on GitHub).
-2. **New Project → Deploy from GitHub repo** → select `vedantu-resume-parser`.
-3. Railway auto-detects this as a Next.js app (via Nixpacks) and starts a first build. It will use
-   the `npm run deploy:start` command from `railway.json`, which runs database migrations, seeds
-   the admin user, and starts the server — in that order, every deploy.
-4. Add a **Volume** (Service → Settings → Volumes → **New Volume**), mount path: `/app/data`. This
-   is where the SQLite database and uploaded resume files will live, persisted across deploys and
-   restarts.
-5. Add these **Variables** (Service → Variables):
+1. **Add Postgres**: In your Railway project, **New → Database → Add PostgreSQL**. Railway
+   provisions it and exposes a `DATABASE_URL` you can reference from the app service.
+2. **Deploy the app**: **New → GitHub Repo** → select `vedantu-resume-parser`. Railway detects the
+   `Dockerfile` and builds from it (see `railway.json`).
+3. **Add a volume** to the app service (Settings → Volumes → New Volume), mount path: `/app/data`
+   — this is only for uploaded resume files now (the database itself lives in Postgres).
+4. **Variables** on the app service:
 
    | Variable | Value |
    |---|---|
-   | `DATABASE_URL` | `file:/app/data/dev.db` |
+   | `DATABASE_URL` | reference the Postgres service's `DATABASE_URL` (Railway lets you pick this from a dropdown, or copy it from the Postgres service's Variables tab) |
    | `UPLOAD_DIR` | `/app/data/uploads` |
    | `GEMINI_API_KEY` | your Gemini API key |
    | `GEMINI_MODEL` | `gemini-2.5-flash` |
    | `ADMIN_USERNAME` | pick an admin username |
-   | `ADMIN_PASSWORD` | pick a **strong** password &mdash; not the local dev one |
-   | `SESSION_SECRET` | a long random string (generate one below) |
+   | `ADMIN_PASSWORD` | a **strong** password |
+   | `SESSION_SECRET` | a long random string (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) |
 
-   Generate a fresh `SESSION_SECRET` locally with:
-   ```bash
-   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-   ```
-
-6. Trigger a deploy (Railway usually does this automatically once variables + volume are set —
-   otherwise click **Deploy**).
-7. Once it's live, go to **Settings → Networking → Generate Domain** to get a public
-   `https://<something>.up.railway.app` URL.
+5. Deploy. The Docker image's `CMD` runs `npm run deploy:start`, which applies migrations against
+   Postgres, seeds/syncs the admin user, then starts the server.
+6. **Settings → Networking → Generate Domain** for the public URL.
 
 ## After that
 
-- Candidate form: `https://<your-domain>/`
-- Admin panel: `https://<your-domain>/admin/login`
-- Every future `git push` to `main` auto-redeploys (migrations + seed re-run safely each time).
-- If you ever change `ADMIN_USERNAME`/`ADMIN_PASSWORD` in Railway's Variables, just redeploy (or
-  restart the service) — the seed step re-syncs the admin account on every boot.
+- Every `git push` to `main` rebuilds the Docker image and redeploys.
+- Changing `ADMIN_USERNAME`/`ADMIN_PASSWORD` in Variables takes effect on the next deploy/restart
+  (the seed step re-syncs it every boot).

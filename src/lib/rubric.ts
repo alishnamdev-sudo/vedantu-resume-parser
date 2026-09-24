@@ -27,6 +27,12 @@ const PROGRAMME_ALIASES: Record<string, ProgrammeId> = {
   "super math (v-math)": "SUPER_MATH",
   "v-math": "SUPER_MATH",
   vmath: "SUPER_MATH",
+  // Short cohort codes used in the bulk CSV.
+  ess: "PHONICS",
+  ss: "SUPER_SPEAKERS",
+  coders: "SUPER_CODERS",
+  "v math": "SUPER_MATH",
+  "v maths": "SUPER_MATH",
 };
 
 /** Matches a free-text CSV value (name or internal code, any case) to a programme id. */

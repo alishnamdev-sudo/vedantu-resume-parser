@@ -55,7 +55,6 @@ export function parseCsv(text: string): string[][] {
 const HEADER_ALIASES: Record<string, string[]> = {
   name: ["name", "candidate name", "candidate"],
   resumeUrl: ["resume link", "resume url", "resume", "cv link", "cv url", "link", "url"],
-  subject: ["subject"],
   programme: ["programme", "program", "programme applied", "program applied"],
   email: ["email", "email id", "email address", "e-mail"],
   phone: ["phone", "phone number", "contact", "contact number", "contact no", "mobile", "mobile number"],
@@ -64,7 +63,6 @@ const HEADER_ALIASES: Record<string, string[]> = {
 export type BulkCsvRow = {
   name: string;
   resumeUrl: string;
-  subject: string;
   programme: string;
   email: string;
   phone: string;
@@ -101,7 +99,6 @@ export function parseCandidateCsv(text: string): {
   const rows: BulkCsvRow[] = table.slice(1).map((cells) => ({
     name: cell(cells, "name"),
     resumeUrl: cell(cells, "resumeUrl"),
-    subject: cell(cells, "subject"),
     programme: cell(cells, "programme"),
     email: cell(cells, "email"),
     phone: cell(cells, "phone"),

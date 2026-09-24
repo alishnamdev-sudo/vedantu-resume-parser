@@ -10,7 +10,6 @@ const PROGRAMME_IDS = PROGRAMMES.map((p) => p.id) as [ProgrammeId, ...ProgrammeI
 const RowSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200),
   resumeUrl: z.string().trim().min(1, "Resume link is required"),
-  subject: z.string().trim().max(200).optional().nullable(),
   programme: z.string().trim().min(1, "Programme is required"),
   email: z.string().trim().email("Invalid email address").optional(),
   phone: z.string().trim().max(30).optional(),
@@ -26,7 +25,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { name, resumeUrl, subject, email, phone } = parsed.data;
+  const { name, resumeUrl, email, phone } = parsed.data;
 
   const programme = resolveProgramme(parsed.data.programme);
   if (!programme || !PROGRAMME_IDS.includes(programme)) {
@@ -62,7 +61,6 @@ export async function POST(request: NextRequest) {
       name,
       email,
       phone,
-      subject,
       programme,
       source: "BULK_CSV",
       resumeFileName: name.replace(/[^a-z0-9]+/gi, "_") + ext,

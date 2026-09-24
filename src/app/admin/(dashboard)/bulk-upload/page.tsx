@@ -62,7 +62,7 @@ export default function BulkUploadPage() {
     if (missingColumns.length > 0) {
       setRows([]);
       setParseError(
-        `Couldn't find these required columns in the CSV: ${missingColumns.join(", ")}. Expected columns like "name", "resume link", and "programme" (a "subject" column is optional).`
+        `Couldn't find these required columns in the CSV: ${missingColumns.join(", ")}. Expected columns like "name", "resume link", and "programme" ("email" and "phone" are optional).`
       );
       return;
     }
@@ -123,7 +123,6 @@ export default function BulkUploadPage() {
           body: JSON.stringify({
             name: row.name,
             resumeUrl: row.resumeUrl,
-            subject: row.subject || undefined,
             programme: row.programme,
             email: row.email || undefined,
             phone: row.phone || undefined,
@@ -177,7 +176,7 @@ export default function BulkUploadPage() {
         <h1 className="text-2xl font-bold text-gray-900">Bulk upload from CSV</h1>
       </div>
       <p className="mt-2 max-w-2xl text-gray-600">
-        Upload a CSV with candidate name, resume link, programme, email, phone, and subject. Each resume will be
+        Upload a CSV with candidate name, resume link, programme, email, and phone. Each resume will be
         downloaded and run through the same analysis as the online form.
       </p>
 
@@ -194,16 +193,14 @@ export default function BulkUploadPage() {
             or a Google Drive share link
           </li>
           <li>
-            <strong>programme</strong> (required) &mdash; e.g. {PROGRAMMES.map((p) => p.label).join(", ")}
+            <strong>programme</strong> (required) &mdash; ESS (English), SS (Speakers), Coders, or V Math
+            (full names like {PROGRAMMES.map((p) => p.label).join(", ")} also work)
           </li>
           <li>
             <strong>email</strong> (optional) &mdash; also matches &ldquo;email id&rdquo;
           </li>
           <li>
             <strong>phone</strong> (optional) &mdash; also matches contact, contact number, mobile
-          </li>
-          <li>
-            <strong>subject</strong> (optional)
           </li>
         </ul>
       </div>
@@ -281,9 +278,6 @@ export default function BulkUploadPage() {
                     Phone
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Subject
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                     Status
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -300,7 +294,6 @@ export default function BulkUploadPage() {
                     <td className="px-4 py-2.5 text-gray-700">{row.programme}</td>
                     <td className="px-4 py-2.5 text-gray-700">{row.email || "—"}</td>
                     <td className="px-4 py-2.5 text-gray-700">{row.phone || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-700">{row.subject || "—"}</td>
                     <td className="px-4 py-2.5">
                       <StatusBadge status={row.status} />
                     </td>

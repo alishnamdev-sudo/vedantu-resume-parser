@@ -12,6 +12,8 @@ const RowSchema = z.object({
   resumeUrl: z.string().trim().min(1, "Resume link is required"),
   subject: z.string().trim().max(200).optional().nullable(),
   programme: z.string().trim().min(1, "Programme is required"),
+  email: z.string().trim().email("Invalid email address").optional(),
+  phone: z.string().trim().max(30).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -24,7 +26,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { name, resumeUrl, subject } = parsed.data;
+  const { name, resumeUrl, subject, email, phone } = parsed.data;
 
   const programme = resolveProgramme(parsed.data.programme);
   if (!programme || !PROGRAMME_IDS.includes(programme)) {
@@ -58,6 +60,8 @@ export async function POST(request: NextRequest) {
   try {
     const { candidateId } = await createAndAnalyzeCandidate({
       name,
+      email,
+      phone,
       subject,
       programme,
       source: "BULK_CSV",

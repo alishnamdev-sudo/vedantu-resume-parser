@@ -21,6 +21,7 @@ function validateRow(row: BulkCsvRow): string | null {
   if (!row.resumeUrl) return "Missing resume link";
   if (!row.programme) return "Missing programme";
   if (!resolveProgramme(row.programme)) return `Unrecognised programme "${row.programme}"`;
+  if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) return `Invalid email "${row.email}"`;
   return null;
 }
 
@@ -124,6 +125,8 @@ export default function BulkUploadPage() {
             resumeUrl: row.resumeUrl,
             subject: row.subject || undefined,
             programme: row.programme,
+            email: row.email || undefined,
+            phone: row.phone || undefined,
           }),
         });
         const data = await res.json();
@@ -174,7 +177,7 @@ export default function BulkUploadPage() {
         <h1 className="text-2xl font-bold text-gray-900">Bulk upload from CSV</h1>
       </div>
       <p className="mt-2 max-w-2xl text-gray-600">
-        Upload a CSV with candidate name, resume link, subject, and programme. Each resume will be
+        Upload a CSV with candidate name, resume link, programme, email, phone, and subject. Each resume will be
         downloaded and run through the same analysis as the online form.
       </p>
 
@@ -192,6 +195,12 @@ export default function BulkUploadPage() {
           </li>
           <li>
             <strong>programme</strong> (required) &mdash; e.g. {PROGRAMMES.map((p) => p.label).join(", ")}
+          </li>
+          <li>
+            <strong>email</strong> (optional) &mdash; also matches &ldquo;email id&rdquo;
+          </li>
+          <li>
+            <strong>phone</strong> (optional) &mdash; also matches contact, contact number, mobile
           </li>
           <li>
             <strong>subject</strong> (optional)
@@ -266,6 +275,12 @@ export default function BulkUploadPage() {
                     Programme
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Email
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Phone
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                     Subject
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -283,6 +298,8 @@ export default function BulkUploadPage() {
                       {row.name || <em className="text-gray-400">missing</em>}
                     </td>
                     <td className="px-4 py-2.5 text-gray-700">{row.programme}</td>
+                    <td className="px-4 py-2.5 text-gray-700">{row.email || "—"}</td>
+                    <td className="px-4 py-2.5 text-gray-700">{row.phone || "—"}</td>
                     <td className="px-4 py-2.5 text-gray-700">{row.subject || "—"}</td>
                     <td className="px-4 py-2.5">
                       <StatusBadge status={row.status} />

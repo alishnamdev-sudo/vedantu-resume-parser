@@ -14,7 +14,8 @@ A small internal tool for candidates applying to VEL's master teacher programmes
 - Admins can also **bulk-upload candidates from a CSV** at `/admin/bulk-upload` &mdash; columns
   for name, a resume link (direct URL or Google Drive share link), subject, and programme. Each
   row is downloaded, parsed, and analyzed the same way as a form submission, with live per-row
-  progress and error reporting. Bulk-uploaded candidates don't have email/phone (not in the CSV).
+  progress and error reporting. Optional `email` and `phone` (or `contact`) columns are saved on the
+  candidate when present.
 
 ## Setup
 

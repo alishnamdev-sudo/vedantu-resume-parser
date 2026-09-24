@@ -57,6 +57,8 @@ const HEADER_ALIASES: Record<string, string[]> = {
   resumeUrl: ["resume link", "resume url", "resume", "cv link", "cv url", "link", "url"],
   subject: ["subject"],
   programme: ["programme", "program", "programme applied", "program applied"],
+  email: ["email", "email id", "email address", "e-mail"],
+  phone: ["phone", "phone number", "contact", "contact number", "contact no", "mobile", "mobile number"],
 };
 
 export type BulkCsvRow = {
@@ -64,6 +66,8 @@ export type BulkCsvRow = {
   resumeUrl: string;
   subject: string;
   programme: string;
+  email: string;
+  phone: string;
 };
 
 export function parseCandidateCsv(text: string): {
@@ -90,11 +94,17 @@ export function parseCandidateCsv(text: string): {
     return { rows: [], missingColumns };
   }
 
+  const cell = (cells: string[], key: keyof BulkCsvRow) => {
+    const idx = columnIndex[key];
+    return idx === undefined ? "" : (cells[idx] ?? "").trim();
+  };
   const rows: BulkCsvRow[] = table.slice(1).map((cells) => ({
-    name: (cells[columnIndex.name!] ?? "").trim(),
-    resumeUrl: (cells[columnIndex.resumeUrl!] ?? "").trim(),
-    subject: columnIndex.subject !== undefined ? (cells[columnIndex.subject] ?? "").trim() : "",
-    programme: (cells[columnIndex.programme!] ?? "").trim(),
+    name: cell(cells, "name"),
+    resumeUrl: cell(cells, "resumeUrl"),
+    subject: cell(cells, "subject"),
+    programme: cell(cells, "programme"),
+    email: cell(cells, "email"),
+    phone: cell(cells, "phone"),
   }));
 
   return { rows, missingColumns: [] };

@@ -58,9 +58,14 @@ On Hold even if their qualification and subject are a perfect match. Never use t
 
 - 3 or more jobs, each under 6 months, in the work history
   => On Hold. Don't reject on this alone, flag it for the culture-fit call to understand the pattern.
-- A gap of more than 12 months in the work history with no explanation
+- A gap of more than 12 months BETWEEN two listed roles with no explanation. Do NOT count time since the
+  last listed role up to today (the CV may simply be older), and do NOT count time between education and
+  the first role - only gaps inside the work history itself.
   => On Hold. Ask about it on the culture-fit call rather than filtering blind.
-- CV suggests candidate currently has a full-time job elsewhere with no flexibility mentioned
+- The CV EXPLICITLY states or clearly shows the candidate currently holds a full-time job elsewhere (e.g. the
+  words "full-time", or a fixed-hours salaried role) and mentions no flexibility. A role that merely ends in
+  "Present" is NOT enough on its own - teaching, tutoring, instructor and freelance roles are often
+  part-time or flexible. Only apply this when full-time employment is actually evident.
   => On Hold. Confirm actual availability against VEL's weekday + alternate-Sunday schedule before booking
   an interview slot.
 `;
@@ -285,17 +290,20 @@ ${PROGRAMME_RUBRICS[programme]}
 ${CLOSING_RULE}
 
 HOW TO DECIDE
-1. First check the three universal pre-checks. If any apply, the candidate cannot be GTG - at best they
-   are On Hold (the pre-check reason still needs to be combined with the programme-specific read).
+1. Check the three universal pre-checks, but only count one when the CV clearly shows it as described.
+   Do not stretch them. If one clearly applies, the candidate cannot be GTG - they are On Hold.
 2. Then read the CV against the programme-specific tables above, top to bottom (clean-match Select first,
    then exceptional/fast-track, then Hold cases, then Reject). Pick the row that best matches the
-   candidate's actual profile as evidenced in the CV text. Do not invent facts not supported by the CV;
-   where the CV is silent on something the rubric asks about (e.g. spoken English, certification), treat
-   it as absent/unproven, which is itself often a Hold signal per the rubric.
+   candidate's actual profile as evidenced in the CV text. Do not invent facts not supported by the CV.
+   Only use On Hold when a specific Hold row (or a pre-check) genuinely matches - never invent a Hold
+   reason of your own. If the CV satisfies a Select row and no Hold row or pre-check clearly applies,
+   the answer is GTG.
+   A Select row that carries a "flag:" note is STILL a Select (GTG): put that note in the flags array,
+   do not downgrade it to On Hold.
 3. Map your decision to exactly one verdict:
    - "GTG" for any Select row (clean match or exceptional/fast-track). Set fastTrack=true only if the
      matched row is from the Exceptional/Fast-Track table.
-   - "ON_HOLD" for any Hold row, or if a universal pre-check applies.
+   - "ON_HOLD" for any Hold row, or if a universal pre-check clearly applies.
    - "NOT_CONSIDERED" only for the Reject row (real subject gap, no adjacent overlap at all). This is a
      last resort per the closing rule.
 4. Write a concise, specific reason (1-3 sentences) grounded in what the CV actually shows, in the same

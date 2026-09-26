@@ -37,6 +37,8 @@ export default function AdminDashboardPage() {
   const [verdict, setVerdict] = useState("");
   const [programme, setProgramme] = useState("");
   const [q, setQ] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -64,6 +66,38 @@ export default function AdminDashboardPage() {
       rejected: candidates.filter((c) => c.verdict === "NOT_CONSIDERED").length,
     };
   }, [candidates]);
+
+  // Only ever act on rows currently visible, so a filter change can't leave hidden rows selected.
+  const selectedIds = candidates.filter((c) => selected.has(c.id)).map((c) => c.id);
+  const allSelected = candidates.length > 0 && selectedIds.length === candidates.length;
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
+
+  async function deleteSelected() {
+    const n = selectedIds.length;
+    if (!confirm(`Delete ${n} report${n === 1 ? "" : "s"} permanently? This also removes the stored resume file${n === 1 ? "" : "s"} and can't be undone.`)) return;
+
+    setDeleting(true);
+    const results = await Promise.all(
+      selectedIds.map((id) =>
+        fetch(`/api/admin/candidates/${id}`, { method: "DELETE" }).then(
+          (res) => (res.ok || res.status === 404 ? id : null),
+          () => null
+        )
+      )
+    );
+    const deleted = new Set(results.filter((id): id is string => id !== null));
+    setCandidates((prev) => prev.filter((c) => !deleted.has(c.id)));
+    setSelected((prev) => new Set([...prev].filter((id) => !deleted.has(id))));
+    setDeleting(false);
+    if (deleted.size < n) alert(`${n - deleted.size} report(s) could not be deleted. Please try again.`);
+  }
 
   return (
     <div>
@@ -105,12 +139,32 @@ export default function AdminDashboardPage() {
             </option>
           ))}
         </select>
+        {selectedIds.length > 0 && (
+          <button
+            onClick={deleteSelected}
+            disabled={deleting}
+            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-60 sm:ml-auto"
+          >
+            {deleting ? "Deleting…" : `Delete selected (${selectedIds.length})`}
+          </button>
+        )}
       </div>
 
       <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50/80">
             <tr>
+              <th className="w-10 px-4 py-3">
+                <input
+                  type="checkbox"
+                  aria-label="Select all"
+                  checked={allSelected}
+                  onChange={() =>
+                    setSelected(allSelected ? new Set() : new Set(candidates.map((c) => c.id)))
+                  }
+                  className="h-4 w-4 rounded border-gray-300 accent-indigo-600"
+                />
+              </th>
               <Th>Candidate</Th>
               <Th>Programme</Th>
               <Th>Verdict</Th>
@@ -121,14 +175,14 @@ export default function AdminDashboardPage() {
           <tbody className="divide-y divide-gray-100">
             {loading && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-gray-500">
+                <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
                   Loading…
                 </td>
               </tr>
             )}
             {!loading && candidates.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-gray-500">
+                <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
                   <IconUsers className="mx-auto h-8 w-8 text-gray-300" />
                   <p className="mt-2">No candidates match these filters.</p>
                 </td>
@@ -137,6 +191,15 @@ export default function AdminDashboardPage() {
             {!loading &&
               candidates.map((c) => (
                 <tr key={c.id} className="transition-colors hover:bg-indigo-50/40">
+                  <td className="px-4 py-3.5">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${c.name}`}
+                      checked={selected.has(c.id)}
+                      onChange={() => toggle(c.id)}
+                      className="h-4 w-4 rounded border-gray-300 accent-indigo-600"
+                    />
+                  </td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-semibold text-white">

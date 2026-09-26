@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use as usePromise } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import VerdictBadge from "@/components/VerdictBadge";
 import { programmeLabel } from "@/lib/rubric";
 import {
@@ -47,6 +48,8 @@ export default function CandidateDetailPage({
   const [notFound, setNotFound] = useState(false);
   const [showResume, setShowResume] = useState(false);
   const [reanalyzing, setReanalyzing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
 
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [overrideVerdict, setOverrideVerdict] = useState("GTG");
@@ -74,6 +77,18 @@ export default function CandidateDetailPage({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  async function handleDelete() {
+    if (!confirm("Delete this report permanently? This also removes the stored resume file and can't be undone.")) return;
+    setDeleting(true);
+    const res = await fetch(`/api/admin/candidates/${id}`, { method: "DELETE" });
+    if (res.ok || res.status === 404) {
+      router.push("/admin");
+      return;
+    }
+    setDeleting(false);
+    alert("Could not delete this report. Please try again.");
+  }
 
   async function handleReanalyze() {
     setReanalyzing(true);
@@ -309,6 +324,20 @@ export default function CandidateDetailPage({
                 Edit to set a different verdict manually.
               </p>
             )}
+          </div>
+
+          <div className={cardClass}>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Delete report</h2>
+            <p className="mt-2 text-xs text-gray-500">
+              Permanently removes this candidate, their analysis, and the stored resume file.
+            </p>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="mt-3 w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-60"
+            >
+              {deleting ? "Deleting…" : "Delete report"}
+            </button>
           </div>
         </div>
       </div>

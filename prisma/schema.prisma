@@ -33,6 +33,7 @@ model Candidate {
   subject        String?
   programme      Programme
   source         Source    @default(FORM)
+  uploadedBy     String?
 
   resumeFileName String
   resumeFilePath String

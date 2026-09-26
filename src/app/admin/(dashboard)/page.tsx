@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import VerdictBadge from "@/components/VerdictBadge";
 import { PROGRAMMES, programmeLabel } from "@/lib/rubric";
-import { IconCheckCircle, IconClock, IconSearch, IconUsers, IconXCircle } from "@/components/icons";
+import { IconCheckCircle, IconClock, IconRefresh, IconSearch, IconUsers, IconXCircle } from "@/components/icons";
 
 type CandidateRow = {
   id: string;
@@ -14,6 +14,7 @@ type CandidateRow = {
   subject: string | null;
   programme: string;
   source: string;
+  uploadedBy: string | null;
   verdict: string | null;
   fastTrack: boolean;
   analysisError: string | null;
@@ -36,27 +37,70 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [verdict, setVerdict] = useState("");
   const [programme, setProgramme] = useState("");
+  const [admin, setAdmin] = useState("");
+  const [admins, setAdmins] = useState<string[]>([]);
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [retrying, setRetrying] = useState(false);
+  const [retryMessage, setRetryMessage] = useState<string | null>(null);
+
+  async function handleRetryFailed() {
+    setRetrying(true);
+    setRetryMessage(null);
+    let succeeded = 0;
+    let failed = 0;
+    try {
+      // The endpoint works in capped batches so it can't outlive a proxy timeout;
+      // keep calling while it reports work left.
+      for (;;) {
+        const res = await fetch("/api/admin/retry-failed", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uploadedBy: admin || undefined }),
+        });
+        if (!res.ok) throw new Error("request failed");
+        const data = await res.json();
+        succeeded += data.succeeded;
+        failed += data.failed;
+        setRetryMessage(`Retrying... ${succeeded} recovered, ${data.remaining} left`);
+        if (data.attempted === 0 || data.remaining === 0) break;
+      }
+      setRetryMessage(
+        succeeded === 0 && failed === 0
+          ? "Nothing to retry."
+          : `Recovered ${succeeded}, still failing ${failed}.`
+      );
+      setReloadKey((k) => k + 1);
+    } catch {
+      setRetryMessage("Retry failed. Please try again.");
+    } finally {
+      setRetrying(false);
+    }
+  }
 
   useEffect(() => {
     const controller = new AbortController();
     const params = new URLSearchParams();
     if (verdict) params.set("verdict", verdict);
     if (programme) params.set("programme", programme);
+    if (admin) params.set("uploadedBy", admin);
     if (q) params.set("q", q);
 
     // eslint-disable-next-line react-hooks/set-state-in-effect -- signals the filtered list is refetching
     setLoading(true);
     fetch(`/api/admin/candidates?${params.toString()}`, { signal: controller.signal })
       .then((res) => res.json())
-      .then((data) => setCandidates(data.candidates ?? []))
+      .then((data) => {
+        setCandidates(data.candidates ?? []);
+        setAdmins(data.admins ?? []);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
 
     return () => controller.abort();
-  }, [verdict, programme, q]);
+  }, [verdict, programme, admin, q, reloadKey]);
 
   const counts = useMemo(() => {
     return {
@@ -139,16 +183,34 @@ export default function AdminDashboardPage() {
             </option>
           ))}
         </select>
+        <select value={admin} onChange={(e) => setAdmin(e.target.value)} className={selectClass}>
+          <option value="">All admins</option>
+          {admins.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
         {selectedIds.length > 0 && (
           <button
             onClick={deleteSelected}
             disabled={deleting}
-            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-60 sm:ml-auto"
+            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-60"
           >
             {deleting ? "Deleting…" : `Delete selected (${selectedIds.length})`}
           </button>
         )}
+        <button
+          type="button"
+          onClick={handleRetryFailed}
+          disabled={retrying}
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 sm:ml-auto"
+        >
+          <IconRefresh className={`h-4 w-4 ${retrying ? "animate-spin" : ""}`} />
+          {retrying ? "Retrying..." : admin ? `Retry ${admin}'s failed analyses` : "Retry failed analyses"}
+        </button>
       </div>
+      {retryMessage && <p className="mt-2 text-sm text-gray-600">{retryMessage}</p>}
 
       <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -168,6 +230,7 @@ export default function AdminDashboardPage() {
               <Th>Candidate</Th>
               <Th>Programme</Th>
               <Th>Verdict</Th>
+              <Th>Admin</Th>
               <Th>Submitted</Th>
               <Th />
             </tr>
@@ -240,6 +303,7 @@ export default function AdminDashboardPage() {
                       )}
                     </div>
                   </td>
+                  <td className="px-4 py-3.5 text-gray-700">{c.uploadedBy ?? "—"}</td>
                   <td className="px-4 py-3.5 text-gray-500">{new Date(c.createdAt).toLocaleString()}</td>
                   <td className="px-4 py-3.5 text-right">
                     <Link

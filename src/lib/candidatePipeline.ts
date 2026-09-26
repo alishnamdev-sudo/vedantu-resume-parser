@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
+import type { Candidate } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { analyzeResume } from "@/lib/analyze";
 import { extractResumeText, ResumeExtension } from "@/lib/resumeParse";
@@ -30,50 +31,20 @@ export async function extractAndValidateResumeText(
   return resumeText;
 }
 
-export async function createAndAnalyzeCandidate(params: {
-  name: string;
-  email?: string | null;
-  phone?: string | null;
-  subject?: string | null;
-  programme: ProgrammeId;
-  source: "FORM" | "BULK_CSV";
-  resumeFileName: string;
-  resumeMimeType: string;
-  resumeBuffer: Buffer;
-  resumeExt: ResumeExtension;
-  resumeSourceUrl?: string | null;
-}): Promise<{ candidateId: string }> {
-  const resumeText = await extractAndValidateResumeText(params.resumeBuffer, params.resumeExt);
-
-  await mkdir(UPLOAD_DIR, { recursive: true });
-  const storedFileName = `${randomUUID()}${params.resumeExt}`;
-  const storedFilePath = path.join(UPLOAD_DIR, storedFileName);
-  await writeFile(storedFilePath, params.resumeBuffer);
-
-  const candidate = await prisma.candidate.create({
-    data: {
-      name: params.name,
-      email: params.email || null,
-      phone: params.phone || null,
-      subject: params.subject || null,
-      programme: params.programme,
-      source: params.source,
-      resumeFileName: params.resumeFileName,
-      resumeFilePath: storedFileName,
-      resumeMimeType: params.resumeMimeType,
-      resumeText,
-      resumeSourceUrl: params.resumeSourceUrl || null,
-    },
-  });
-
+/**
+ * Runs the rubric analysis for an already-persisted candidate and saves the verdict.
+ * Single place every caller goes through, so the prompt inputs (notably `subject`)
+ * can't drift between first analysis and a later re-run.
+ */
+export async function analyzeAndSaveCandidate(candidate: Candidate): Promise<Candidate> {
   try {
     const { result, raw } = await analyzeResume({
-      programme: params.programme,
-      candidateName: params.name,
-      resumeText,
-      subject: params.subject,
+      programme: candidate.programme as ProgrammeId,
+      candidateName: candidate.name,
+      resumeText: candidate.resumeText,
+      subject: candidate.subject,
     });
-    await prisma.candidate.update({
+    return await prisma.candidate.update({
       where: { id: candidate.id },
       data: {
         verdict: result.verdict,
@@ -91,7 +62,54 @@ export async function createAndAnalyzeCandidate(params: {
       where: { id: candidate.id },
       data: { analysisError: message },
     });
+    throw err;
   }
+}
 
-  return { candidateId: candidate.id };
+export async function createAndAnalyzeCandidate(params: {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  subject?: string | null;
+  programme: ProgrammeId;
+  source: "FORM" | "BULK_CSV";
+  uploadedBy?: string | null;
+  resumeFileName: string;
+  resumeMimeType: string;
+  resumeBuffer: Buffer;
+  resumeExt: ResumeExtension;
+  resumeSourceUrl?: string | null;
+}): Promise<{ candidateId: string; analysisError: string | null }> {
+  const resumeText = await extractAndValidateResumeText(params.resumeBuffer, params.resumeExt);
+
+  await mkdir(UPLOAD_DIR, { recursive: true });
+  const storedFileName = `${randomUUID()}${params.resumeExt}`;
+  const storedFilePath = path.join(UPLOAD_DIR, storedFileName);
+  await writeFile(storedFilePath, params.resumeBuffer);
+
+  const candidate = await prisma.candidate.create({
+    data: {
+      name: params.name,
+      email: params.email || null,
+      phone: params.phone || null,
+      subject: params.subject || null,
+      programme: params.programme,
+      source: params.source,
+      uploadedBy: params.uploadedBy || null,
+      resumeFileName: params.resumeFileName,
+      resumeFilePath: storedFileName,
+      resumeMimeType: params.resumeMimeType,
+      resumeText,
+      resumeSourceUrl: params.resumeSourceUrl || null,
+    },
+  });
+
+  // The candidate row is already committed; a failed analysis is recorded on the row
+  // (analysisError) and retried later. The public form ignores it; bulk upload shows it.
+  const analysisError = await analyzeAndSaveCandidate(candidate).then(
+    () => null,
+    (err) => (err instanceof Error ? err.message : "Unknown analysis error")
+  );
+
+  return { candidateId: candidate.id, analysisError };
 }

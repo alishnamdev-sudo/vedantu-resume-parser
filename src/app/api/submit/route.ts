@@ -8,6 +8,9 @@ import {
 } from "@/lib/resumeParse";
 import { createAndAnalyzeCandidate, ResumeTextError } from "@/lib/candidatePipeline";
 import { PROGRAMMES, ProgrammeId } from "@/lib/rubric";
+import { clientIp, rateLimit } from "@/lib/rateLimit";
+
+const SUBMISSIONS_PER_HOUR = 5;
 
 const PROGRAMME_IDS = PROGRAMMES.map((p) => p.id) as [ProgrammeId, ...ProgrammeId[]];
 
@@ -64,6 +67,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: `Please upload a resume in one of these formats: ${ACCEPTED_EXTENSIONS.join(", ")}` },
       { status: 400 }
+    );
+  }
+
+  // Checked here rather than up front so a rejected file or a typo'd form doesn't
+  // burn the candidate's quota - only real pipeline runs, which cost money, count.
+  const limit = rateLimit(`submit:${clientIp(request)}`, SUBMISSIONS_PER_HOUR, 60 * 60 * 1000);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many submissions from this network. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } }
     );
   }
 

@@ -7,8 +7,13 @@ export async function GET(request: NextRequest) {
   const verdict = searchParams.get("verdict");
   const programme = searchParams.get("programme");
   const q = searchParams.get("q")?.trim();
+  const uploadedBy = searchParams.get("uploadedBy");
 
   const where: Prisma.CandidateWhereInput = {};
+
+  if (uploadedBy) {
+    where.uploadedBy = uploadedBy;
+  }
 
   if (verdict === "PENDING") {
     where.verdict = null;
@@ -22,9 +27,9 @@ export async function GET(request: NextRequest) {
 
   if (q) {
     where.OR = [
-      { name: { contains: q } },
-      { email: { contains: q } },
-      { phone: { contains: q } },
+      { name: { contains: q, mode: "insensitive" } },
+      { email: { contains: q, mode: "insensitive" } },
+      { phone: { contains: q, mode: "insensitive" } },
     ];
   }
 
@@ -39,6 +44,7 @@ export async function GET(request: NextRequest) {
       subject: true,
       programme: true,
       source: true,
+      uploadedBy: true,
       verdict: true,
       fastTrack: true,
       analysisError: true,
@@ -46,5 +52,13 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  return NextResponse.json({ candidates });
+  // Feeds the dashboard's Admin filter, so it lists every uploader regardless of the current filters.
+  const uploaders = await prisma.candidate.findMany({
+    where: { uploadedBy: { not: null } },
+    distinct: ["uploadedBy"],
+    orderBy: { uploadedBy: "asc" },
+    select: { uploadedBy: true },
+  });
+
+  return NextResponse.json({ candidates, admins: uploaders.map((u) => u.uploadedBy) });
 }

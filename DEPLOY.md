@@ -22,7 +22,7 @@ auth cookies and duplicate deploy configs for no real benefit on an app this siz
    | `DATABASE_URL` | reference the Postgres service's `DATABASE_URL` (Railway lets you pick this from a dropdown, or copy it from the Postgres service's Variables tab) |
    | `UPLOAD_DIR` | `/app/data/uploads` |
    | `GEMINI_API_KEY` | your Gemini API key |
-   | `GEMINI_MODEL` | `gemini-2.5-flash` |
+   | `GEMINI_MODEL` | `gemini-3.5-flash` |
    | `ADMIN_USERNAME` | pick an admin username |
    | `ADMIN_PASSWORD` | a **strong** password |
    | `SESSION_SECRET` | a long random string (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) |

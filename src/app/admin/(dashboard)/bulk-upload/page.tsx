@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { parseCandidateCsv, parseCandidateTable, BulkCsvRow } from "@/lib/csv";
 import { PROGRAMMES, resolveProgramme } from "@/lib/rubric";
@@ -15,6 +15,7 @@ type BulkRow = BulkCsvRow & {
 };
 
 const CONCURRENCY = 3;
+const ADMIN_NAME_KEY = "bulkUploadAdminName";
 
 function validateRow(row: BulkCsvRow): string | null {
   if (!row.name) return "Missing name";
@@ -65,6 +66,25 @@ export default function BulkUploadPage() {
   const [parseError, setParseError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [started, setStarted] = useState(false);
+  const [adminName, setAdminName] = useState("");
+  const trimmedAdminName = adminName.trim();
+
+  // Everyone shares one login, so the typed name is what attributes uploads. Remembering it
+  // per browser keeps each admin's spelling consistent, which keeps the dashboard filter clean.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(ADMIN_NAME_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restores the name after hydration
+      if (saved) setAdminName(saved);
+    } catch {}
+  }, []);
+
+  function handleAdminNameChange(value: string) {
+    setAdminName(value);
+    try {
+      localStorage.setItem(ADMIN_NAME_KEY, value.trim());
+    } catch {}
+  }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -107,6 +127,8 @@ export default function BulkUploadPage() {
   }
 
   async function handleStart() {
+    if (!trimmedAdminName) return;
+    const uploadedBy = trimmedAdminName;
     setStarted(true);
     setProcessing(true);
 
@@ -151,13 +173,28 @@ export default function BulkUploadPage() {
             programme: row.programme,
             email: row.email || undefined,
             phone: row.phone || undefined,
+            uploadedBy,
           }),
         });
         const data = await res.json();
         setRows((prev) => {
           const next = [...prev];
-          if (res.ok) {
-            next[index] = { ...next[index], status: "success", detail: "Analyzed", candidateId: data.candidateId };
+          if (res.ok && data.analysisError) {
+            // Saved, but Gemini didn't return a verdict. Marked failed so "Re-run" picks it up;
+            // the server finds the saved candidate and only redoes the analysis.
+            next[index] = {
+              ...next[index],
+              status: "error",
+              detail: "Saved, but analysis failed. Re-run to retry.",
+              candidateId: data.candidateId,
+            };
+          } else if (res.ok) {
+            next[index] = {
+              ...next[index],
+              status: "success",
+              detail: data.duplicate ? "Already uploaded" : "Analyzed",
+              candidateId: data.candidateId,
+            };
           } else {
             next[index] = { ...next[index], status: "error", detail: data.error || "Failed" };
           }
@@ -230,7 +267,27 @@ export default function BulkUploadPage() {
         </ul>
       </div>
 
-      <div className="mt-6 flex items-center gap-3">
+      <div className="mt-6 max-w-sm">
+        <label htmlFor="admin-name" className="block text-sm font-medium text-gray-800">
+          Your name <span className="text-red-600">*</span>
+        </label>
+        <input
+          id="admin-name"
+          type="text"
+          required
+          maxLength={100}
+          value={adminName}
+          onChange={(e) => handleAdminNameChange(e.target.value)}
+          disabled={processing}
+          placeholder="e.g. Priya Sharma"
+          className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Every candidate in this upload is tagged with this name, so you can filter for them on the dashboard.
+        </p>
+      </div>
+
+      <div className="mt-4 flex items-center gap-3">
         <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-600/20 transition-all hover:shadow-indigo-600/35 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
           <IconArrowUpTray className="h-4 w-4" />
           Choose CSV or Excel file
@@ -239,7 +296,7 @@ export default function BulkUploadPage() {
             type="file"
             accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             onChange={handleFileChange}
-            disabled={processing}
+            disabled={processing || !trimmedAdminName}
             className="hidden"
           />
         </label>
@@ -278,7 +335,7 @@ export default function BulkUploadPage() {
             </div>
             <button
               onClick={handleStart}
-              disabled={processing}
+              disabled={processing || !trimmedAdminName}
               className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-600/20 transition-all hover:shadow-indigo-600/35 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {processing && <IconRefresh className="h-4 w-4 animate-spin" />}
@@ -324,12 +381,15 @@ export default function BulkUploadPage() {
                     </td>
                     <td className="px-4 py-2.5 text-gray-600">
                       {row.status === "success" && row.candidateId ? (
-                        <Link
-                          href={`/admin/candidates/${row.candidateId}`}
-                          className="font-medium text-indigo-600 hover:text-indigo-500"
-                        >
-                          View result
-                        </Link>
+                        <>
+                          {row.detail} &middot;{" "}
+                          <Link
+                            href={`/admin/candidates/${row.candidateId}`}
+                            className="font-medium text-indigo-600 hover:text-indigo-500"
+                          >
+                            View result
+                          </Link>
+                        </>
                       ) : (
                         row.detail
                       )}

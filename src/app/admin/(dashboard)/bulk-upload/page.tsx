@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { parseCandidateCsv, BulkCsvRow } from "@/lib/csv";
+import { parseCandidateCsv, parseCandidateTable, BulkCsvRow } from "@/lib/csv";
 import { PROGRAMMES, resolveProgramme } from "@/lib/rubric";
 import { IconArrowLeft, IconArrowUpTray, IconRefresh } from "@/components/icons";
 
@@ -23,6 +23,24 @@ function validateRow(row: BulkCsvRow): string | null {
   if (!resolveProgramme(row.programme)) return `Unrecognised programme "${row.programme}"`;
   if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) return `Invalid email "${row.email}"`;
   return null;
+}
+
+async function readCandidateFile(file: File) {
+  if (/\.xls$/i.test(file.name)) {
+    throw new Error("The old .xls format isn't supported. Please re-save it as .xlsx (or CSV) and try again.");
+  }
+  if (/\.xlsx$/i.test(file.name)) {
+    // Loaded on demand so the Excel reader isn't part of every admin page's bundle.
+    const { readSheet } = await import("read-excel-file/browser");
+    let sheet;
+    try {
+      sheet = await readSheet(file); // first sheet only
+    } catch {
+      throw new Error("Couldn't read that Excel file. Make sure it's a valid .xlsx workbook.");
+    }
+    return parseCandidateTable(sheet.map((row) => row.map((cell) => (cell == null ? "" : String(cell)))));
+  }
+  return parseCandidateCsv(await file.text());
 }
 
 async function runWithConcurrency<T>(
@@ -56,13 +74,20 @@ export default function BulkUploadPage() {
     setParseError(null);
     setFileName(file.name);
 
-    const text = await file.text();
-    const { rows: parsedRows, missingColumns } = parseCandidateCsv(text);
+    let parsed: ReturnType<typeof parseCandidateCsv>;
+    try {
+      parsed = await readCandidateFile(file);
+    } catch (err) {
+      setRows([]);
+      setParseError(err instanceof Error ? err.message : "Couldn't read that file.");
+      return;
+    }
+    const { rows: parsedRows, missingColumns } = parsed;
 
     if (missingColumns.length > 0) {
       setRows([]);
       setParseError(
-        `Couldn't find these required columns in the CSV: ${missingColumns.join(", ")}. Expected columns like "name", "resume link", and "programme" ("email" and "phone" are optional).`
+        `Couldn't find these required columns in the file: ${missingColumns.join(", ")}. Expected columns like "name", "resume link", and "programme" ("email" and "phone" are optional).`
       );
       return;
     }
@@ -173,10 +198,10 @@ export default function BulkUploadPage() {
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 shadow-md shadow-indigo-600/20">
           <IconArrowUpTray className="h-5 w-5 text-white" />
         </span>
-        <h1 className="text-2xl font-bold text-gray-900">Bulk upload from CSV</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Bulk upload from CSV or Excel</h1>
       </div>
       <p className="mt-2 max-w-2xl text-gray-600">
-        Upload a CSV with candidate name, resume link, programme, email, and phone. Each resume will be
+        Upload a CSV or Excel (.xlsx, first sheet) file with candidate name, resume link, programme, email, and phone. Each resume will be
         downloaded and run through the same analysis as the online form.
       </p>
 
@@ -208,11 +233,11 @@ export default function BulkUploadPage() {
       <div className="mt-6 flex items-center gap-3">
         <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-600/20 transition-all hover:shadow-indigo-600/35 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
           <IconArrowUpTray className="h-4 w-4" />
-          Choose CSV file
+          Choose CSV or Excel file
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             onChange={handleFileChange}
             disabled={processing}
             className="hidden"

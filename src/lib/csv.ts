@@ -68,11 +68,15 @@ export type BulkCsvRow = {
   phone: string;
 };
 
-export function parseCandidateCsv(text: string): {
+export function parseCandidateCsv(text: string) {
+  return parseCandidateTable(parseCsv(text));
+}
+
+/** Maps a header-first table (from a CSV or an Excel sheet) onto candidate rows. */
+export function parseCandidateTable(table: string[][]): {
   rows: BulkCsvRow[];
   missingColumns: string[];
 } {
-  const table = parseCsv(text);
   if (table.length === 0) {
     return { rows: [], missingColumns: ["name", "resumeUrl", "programme"] };
   }
@@ -96,13 +100,16 @@ export function parseCandidateCsv(text: string): {
     const idx = columnIndex[key];
     return idx === undefined ? "" : (cells[idx] ?? "").trim();
   };
-  const rows: BulkCsvRow[] = table.slice(1).map((cells) => ({
-    name: cell(cells, "name"),
-    resumeUrl: cell(cells, "resumeUrl"),
-    programme: cell(cells, "programme"),
-    email: cell(cells, "email"),
-    phone: cell(cells, "phone"),
-  }));
+  const rows: BulkCsvRow[] = table
+    .slice(1)
+    .filter((cells) => cells.some((c) => c.trim() !== ""))
+    .map((cells) => ({
+      name: cell(cells, "name"),
+      resumeUrl: cell(cells, "resumeUrl"),
+      programme: cell(cells, "programme"),
+      email: cell(cells, "email"),
+      phone: cell(cells, "phone"),
+    }));
 
   return { rows, missingColumns: [] };
 }

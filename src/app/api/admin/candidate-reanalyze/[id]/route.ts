@@ -13,7 +13,7 @@ export async function POST(
   }
 
   try {
-    const candidate = await analyzeAndSaveCandidate(existing);
+    const candidate = await analyzeAndSaveCandidate(existing, "REANALYZE");
     return NextResponse.json({ candidate });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown analysis error";

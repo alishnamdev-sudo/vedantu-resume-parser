@@ -1,9 +1,9 @@
 import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
-import type { Candidate } from "@prisma/client";
+import type { AnalysisTrigger, Candidate } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { analyzeResume } from "@/lib/analyze";
+import { AnalysisAttempt, analyzeResume } from "@/lib/analyze";
 import { extractResumeText, ResumeExtension } from "@/lib/resumeParse";
 import { ProgrammeId } from "@/lib/rubric";
 import { UPLOAD_DIR } from "@/lib/uploadDir";
@@ -36,14 +36,21 @@ export async function extractAndValidateResumeText(
  * Single place every caller goes through, so the prompt inputs (notably `subject`)
  * can't drift between first analysis and a later re-run.
  */
-export async function analyzeAndSaveCandidate(candidate: Candidate): Promise<Candidate> {
+export async function analyzeAndSaveCandidate(
+  candidate: Candidate,
+  trigger: AnalysisTrigger
+): Promise<Candidate> {
+  const attempts: AnalysisAttempt[] = [];
   try {
-    const { result, raw } = await analyzeResume({
-      programme: candidate.programme as ProgrammeId,
-      candidateName: candidate.name,
-      resumeText: candidate.resumeText,
-      subject: candidate.subject,
-    });
+    const { result, raw } = await analyzeResume(
+      {
+        programme: candidate.programme as ProgrammeId,
+        candidateName: candidate.name,
+        resumeText: candidate.resumeText,
+        subject: candidate.subject,
+      },
+      (attempt) => attempts.push(attempt)
+    );
     return await prisma.candidate.update({
       where: { id: candidate.id },
       data: {
@@ -63,6 +70,36 @@ export async function analyzeAndSaveCandidate(candidate: Candidate): Promise<Can
       data: { analysisError: message },
     });
     throw err;
+  } finally {
+    await saveAnalysisRuns(candidate.id, trigger, attempts);
+  }
+}
+
+/** Best-effort: the metrics log must never cost a candidate their verdict. */
+async function saveAnalysisRuns(candidateId: string, trigger: AnalysisTrigger, attempts: AnalysisAttempt[]) {
+  if (attempts.length === 0) return;
+  try {
+    await prisma.analysisRun.createMany({
+      data: attempts.map((a) => ({
+        candidateId,
+        trigger,
+        model: a.model,
+        promptVersion: a.promptVersion,
+        attempt: a.attempt,
+        status: a.status,
+        errorMessage: a.errorMessage,
+        latencyMs: a.latencyMs,
+        inputTokens: a.usage?.inputTokens,
+        cachedInputTokens: a.usage?.cachedInputTokens,
+        outputTokens: a.usage?.outputTokens,
+        thinkingTokens: a.usage?.thinkingTokens,
+        costUsd: a.costUsd,
+        verdict: a.verdict,
+        fastTrack: a.fastTrack,
+      })),
+    });
+  } catch (err) {
+    console.warn("Failed to record analysis runs", candidateId, err);
   }
 }
 
@@ -106,7 +143,7 @@ export async function createAndAnalyzeCandidate(params: {
 
   // The candidate row is already committed; a failed analysis is recorded on the row
   // (analysisError) and retried later. The public form ignores it; bulk upload shows it.
-  const analysisError = await analyzeAndSaveCandidate(candidate).then(
+  const analysisError = await analyzeAndSaveCandidate(candidate, params.source).then(
     () => null,
     (err) => (err instanceof Error ? err.message : "Unknown analysis error")
   );

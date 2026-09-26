@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     if (existing.verdict && !existing.analysisError) {
       return NextResponse.json({ ok: true, candidateId: existing.id, duplicate: true, analysisError: null });
     }
-    const analysisError = await analyzeAndSaveCandidate(existing).then(
+    const analysisError = await analyzeAndSaveCandidate(existing, "BULK_CSV").then(
       () => null,
       (err) => (err instanceof Error ? err.message : "Unknown analysis error")
     );

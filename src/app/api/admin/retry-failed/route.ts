@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     const index = next++;
     if (index >= candidates.length) return;
     try {
-      await analyzeAndSaveCandidate(candidates[index]);
+      await analyzeAndSaveCandidate(candidates[index], "RETRY");
       succeeded++;
     } catch {
       failed++;

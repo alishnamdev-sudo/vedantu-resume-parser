@@ -51,6 +51,48 @@ model Candidate {
 
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+
+  analysisRuns   AnalysisRun[]
+}
+
+enum AnalysisTrigger {
+  FORM
+  BULK_CSV
+  RETRY
+  REANALYZE
+}
+
+enum AnalysisStatus {
+  OK
+  INVALID_JSON
+  SCHEMA_MISMATCH
+  API_ERROR
+}
+
+/// One row per Gemini attempt (retries included, since they're billed too).
+model AnalysisRun {
+  id                String          @id @default(cuid())
+  // SetNull keeps cost history when a candidate is deleted.
+  candidate         Candidate?      @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+  candidateId       String?
+  trigger           AnalysisTrigger
+  model             String
+  promptVersion     String
+  attempt           Int
+  status            AnalysisStatus
+  errorMessage      String?
+  latencyMs         Int
+  inputTokens       Int?
+  cachedInputTokens Int?
+  outputTokens      Int?
+  thinkingTokens    Int?
+  costUsd           Decimal?        @db.Decimal(10, 6)
+  verdict           Verdict?
+  fastTrack         Boolean?
+  createdAt         DateTime        @default(now())
+
+  @@index([createdAt])
+  @@index([candidateId])
 }
 
 model AdminUser {
